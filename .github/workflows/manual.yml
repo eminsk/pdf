@@ -19,44 +19,43 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: pdf-linux
-            asset_name: pdf-linux
           - os: windows-latest
             artifact_name: pdf-windows.exe
-            asset_name: pdf-windows.exe
           - os: macos-latest
             artifact_name: pdf-macos
-            asset_name: pdf-macos
-
+    
     runs-on: ${{ matrix.os }}
-
+    timeout-minutes: 30
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
+      
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-
+          pip install pyinstaller
+      
       - name: Build executable with PyInstaller
         run: |
           pyinstaller --onefile --windowed --name pdf main.py
-
+      
       - name: Rename executable (Linux/Mac)
         if: runner.os != 'Windows'
         run: |
-          mv dist/rps-game dist/${{ matrix.artifact_name }}
-
+          mv dist/pdf dist/${{ matrix.artifact_name }}
+      
       - name: Rename executable (Windows)
         if: runner.os == 'Windows'
         run: |
-          move dist\rps-game.exe dist\${{ matrix.artifact_name }}
+          move dist\pdf.exe dist\${{ matrix.artifact_name }}
         shell: cmd
-
+      
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -68,22 +67,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           path: ./artifacts
-
+      
       - name: Make executables executable
         run: |
           chmod +x ./artifacts/pdf-linux || true
           chmod +x ./artifacts/pdf-macos || true
-
+      
       - name: Get version
         id: get_version
         run: |
@@ -92,7 +91,7 @@ jobs:
           else
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
-
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
