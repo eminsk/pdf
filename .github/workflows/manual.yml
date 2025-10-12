@@ -1,4 +1,4 @@
-name: Build and Release Executables
+name: Build and Release with Nuitka
 
 on:
   workflow_dispatch:
@@ -14,6 +14,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
@@ -25,7 +26,7 @@ jobs:
             artifact_name: pdf-macos
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     
     steps:
       - name: Checkout repository
@@ -35,32 +36,87 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
       
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install nuitka ordered-set zstandard
       
-      - name: Build executable with PyInstaller
+      - name: Install platform dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
-          pyinstaller --onefile --windowed --name pdf main.py
+          sudo apt-get update
+          sudo apt-get install -y ccache patchelf
       
-      - name: Rename executable (Linux/Mac)
-        if: runner.os != 'Windows'
+      - name: Install platform dependencies (macOS)
+        if: runner.os == 'macOS'
         run: |
-          mv dist/pdf dist/${{ matrix.artifact_name }}
+          brew install ccache
       
-      - name: Rename executable (Windows)
+      - name: Build with Nuitka (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python -m nuitka \
+            --onefile \
+            --standalone \
+            --assume-yes-for-downloads \
+            --output-filename=${{ matrix.artifact_name }} \
+            --enable-plugin=tk-inter \
+            --linux-icon=icon.png \
+            --company-name="YourCompany" \
+            --product-name="PDF Tool" \
+            --file-version=1.0.0 \
+            --product-version=1.0.0 \
+            main.py
+      
+      - name: Build with Nuitka (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python -m nuitka \
+            --onefile \
+            --standalone \
+            --assume-yes-for-downloads \
+            --output-filename=${{ matrix.artifact_name }} \
+            --enable-plugin=tk-inter \
+            --macos-create-app-bundle \
+            --macos-app-icon=icon.icns \
+            --company-name="YourCompany" \
+            --product-name="PDF Tool" \
+            --file-version=1.0.0 \
+            --product-version=1.0.0 \
+            main.py
+      
+      - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
         run: |
-          move dist\pdf.exe dist\${{ matrix.artifact_name }}
+          python -m nuitka ^
+            --onefile ^
+            --standalone ^
+            --assume-yes-for-downloads ^
+            --output-filename=${{ matrix.artifact_name }} ^
+            --windows-console-mode=disable ^
+            --enable-plugin=tk-inter ^
+            --windows-icon-from-ico=icon.ico ^
+            --company-name="YourCompany" ^
+            --product-name="PDF Tool" ^
+            --file-version=1.0.0.0 ^
+            --product-version=1.0.0.0 ^
+            --copyright="Copyright 2025" ^
+            main.py
         shell: cmd
+      
+      - name: Make executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: chmod +x ${{ matrix.artifact_name }}
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+          retention-days: 7
 
   release:
     needs: build
@@ -76,32 +132,33 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-          path: ./artifacts
+          path: ./release-artifacts
       
-      - name: Make executables executable
+      - name: Verify artifacts
         run: |
-          chmod +x ./artifacts/pdf-linux || true
-          chmod +x ./artifacts/pdf-macos || true
+          ls -lah ./release-artifacts/
+          file ./release-artifacts/* || true
       
       - name: Get version
-        id: get_version
+        id: version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           draft: false
           prerelease: false
+          generate_release_notes: true
           files: |
-            ./artifacts/pdf-linux
-            ./artifacts/pdf-windows.exe
-            ./artifacts/pdf-macos
+            ./release-artifacts/pdf-linux
+            ./release-artifacts/pdf-windows.exe
+            ./release-artifacts/pdf-macos
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
