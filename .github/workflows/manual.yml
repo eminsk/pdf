@@ -47,8 +47,7 @@ jobs:
 
       - name: Build Executable with Nuitka (Windows)
         if: matrix.os == 'windows-latest'
-        run: |
-          python -m nuitka --standalone --enable-plugin=tk-inter --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build --output-file=PDF-Viewer main.py
+        run: python -m nuitka --standalone --enable-plugin=tk-inter --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build --output-file=PDF-Viewer main.py
         shell: cmd
 
       - name: Build Executable with Nuitka (Unix)
@@ -68,14 +67,22 @@ jobs:
         run: |
           Get-ChildItem -Path "build" -Recurse -Filter "*.exe" | ForEach-Object {
             Copy-Item $_.FullName -Destination "build/PDF-Viewer.exe" -Force
+            Write-Host "Copied: $($_.FullName)"
+          }
+          if (Test-Path "build/PDF-Viewer.exe") {
+            Write-Host "✓ PDF-Viewer.exe готов!"
           }
         shell: pwsh
 
       - name: Find and Copy Executable (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          find build -type f -executable -name "*.bin" -o -name "PDF-Viewer" -o -name "main" | head -1 | xargs -I {} cp {} build/PDF-Viewer.bin || true
-          chmod +x build/PDF-Viewer.bin || true
+          find build -type f \( -executable -o -name "*.bin" -o -name "PDF-Viewer" \) | head -1 | xargs -I {} cp {} build/PDF-Viewer.bin || true
+          chmod +x build/PDF-Viewer.bin 2>/dev/null || true
+          if [ -f "build/PDF-Viewer.bin" ]; then
+            echo "✓ PDF-Viewer.bin готов!"
+            ls -lh build/PDF-Viewer.bin
+          fi
         shell: bash
 
       - name: Upload Artifacts
