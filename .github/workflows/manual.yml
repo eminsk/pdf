@@ -13,15 +13,15 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            output: '*.exe'
+            output: 'PDF-Viewer.exe'
             name: Windows
             console-mode: disable
           - os: ubuntu-latest
-            output: '*.bin'
+            output: 'PDF-Viewer.bin'
             name: Linux
             console-mode: force
           - os: macos-latest
-            output: '*.app/**/*'
+            output: 'PDF-Viewer.bin'
             name: macOS
             console-mode: force
 
@@ -34,33 +34,53 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
+          version: "0.5.11"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
-      - name: Set up Python
-        run: uv python install 3.12
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Install Dependencies
-        run: uv sync --frozen
+        run: |
+          uv pip install --system pymupdf pillow nuitka
 
       - name: Build Executable with Nuitka
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          nuitka-version: main
-          script-name: main.py
-          mode: standalone
-          enable-plugins: tk-inter
-          windows-console-mode: ${{ matrix.console-mode }}
-          output-file: PDF-Viewer
+        run: |
+          python -m nuitka --standalone \
+            --enable-plugin=tk-inter \
+            --windows-console-mode=${{ matrix.console-mode }} \
+            --assume-yes-for-downloads \
+            --output-dir=build \
+            --output-file=PDF-Viewer \
+            main.py
+
+      - name: Rename Output (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          if (Test-Path "build\main.dist") {
+            Rename-Item -Path "build\main.dist\main.exe" -NewName "PDF-Viewer.exe"
+          }
+        shell: pwsh
+
+      - name: Rename Output (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          if [ -f "build/main.dist/main.bin" ]; then
+            mv build/main.dist/main.bin build/main.dist/PDF-Viewer.bin
+          elif [ -f "build/main.bin" ]; then
+            mv build/main.bin build/PDF-Viewer.bin
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PDF-Viewer-${{ matrix.name }}
           path: |
+            build/main.dist/${{ matrix.output }}
             build/${{ matrix.output }}
-            build/*.dist/**/*
-          include-hidden-files: true
+          if-no-files-found: warn
 
   release:
     needs: build
@@ -76,11 +96,13 @@ jobs:
         with:
           path: artifacts
 
+      - name: Display structure
+        run: ls -R artifacts/
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/**/*
+          files: artifacts/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
