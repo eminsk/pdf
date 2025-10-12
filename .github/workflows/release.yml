@@ -1,4 +1,4 @@
-name: Build and Release with Nuitka
+name: Build and Release
 
 on:
   workflow_dispatch:
@@ -16,20 +16,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             artifact_name: pdf-linux
-            output_dir: .
+            build_type: nuitka
           - os: windows-latest
             artifact_name: pdf-windows.exe
-            output_dir: .
+            build_type: pyinstaller
           - os: macos-latest
             artifact_name: pdf-macos.app
-            output_dir: .
+            build_type: nuitka
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -45,7 +44,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install "nuitka>=2.6" ordered-set zstandard
+
+      - name: Install Nuitka (Linux/macOS)
+        if: matrix.build_type == 'nuitka'
+        run: pip install "nuitka>=2.6" ordered-set zstandard
+
+      - name: Install PyInstaller (Windows)
+        if: matrix.build_type == 'pyinstaller'
+        run: pip install pyinstaller
 
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
@@ -56,12 +62,6 @@ jobs:
       - name: Install platform dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install ccache
-
-      - name: Setup ccache (Linux/macOS)
-        if: runner.os != 'Windows'
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ matrix.os }}-ccache
 
       - name: Build with Nuitka (Linux)
         if: runner.os == 'Linux'
@@ -76,7 +76,6 @@ jobs:
             --file-version=1.0.0 \
             --product-version=1.0.0 \
             --lto=no \
-            --jobs=2 \
             main.py
 
       - name: Build with Nuitka (macOS)
@@ -86,63 +85,57 @@ jobs:
             --standalone \
             --macos-create-app-bundle \
             --assume-yes-for-downloads \
-            --output-filename=${{ matrix.artifact_name }} \
+            --macos-app-name="PDF Tool" \
             --enable-plugin=tk-inter \
             --company-name="YourCompany" \
             --product-name="PDF Tool" \
             --file-version=1.0.0 \
             --product-version=1.0.0 \
             --lto=no \
-            --jobs=2 \
             main.py
 
-      - name: Build with Nuitka (Windows)
+      - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         run: |
-          python -m nuitka ^
+          pyinstaller ^
             --onefile ^
-            --assume-yes-for-downloads ^
-            --output-filename=${{ matrix.artifact_name }} ^
-            --windows-console-mode=disable ^
-            --enable-plugin=tk-inter ^
-            --windows-icon-from-ico=icon.ico ^
-            --company-name="YourCompany" ^
-            --product-name="PDF Tool" ^
-            --file-version=1.0.0.0 ^
-            --product-version=1.0.0.0 ^
-            --copyright="Copyright 2025" ^
-            --lto=no ^
-            --jobs=1 ^
-            --msvc=latest ^
+            --windowed ^
+            --name=pdf-windows ^
+            --icon=icon.ico ^
             main.py
         shell: cmd
-        env:
-          NUITKA_CACHE_DIR: ${{ runner.temp }}\nuitka_cache
 
-      - name: Make executable (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          if [ -f "${{ matrix.artifact_name }}" ]; then
-            chmod +x "${{ matrix.artifact_name }}"
-          elif [ -d "${{ matrix.artifact_name }}" ]; then
-            echo "macOS app bundle created"
-          fi
+      - name: Make executable (Linux)
+        if: runner.os == 'Linux'
+        run: chmod +x ${{ matrix.artifact_name }}
 
-      - name: Upload artifact (Windows/Linux)
-        if: runner.os != 'macOS'
+      - name: Upload artifact (Linux)
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: pdf-linux
           path: ${{ matrix.artifact_name }}
-          retention-days: 7
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-windows.exe
+          path: dist/pdf-windows.exe
+
+      - name: Zip macOS app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd main.app
+          zip -r ../pdf-macos.zip .
+          cd ..
 
       - name: Upload artifact (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: main.app
-          retention-days: 7
+          name: pdf-macos.zip
+          path: pdf-macos.zip
 
   release:
     needs: build
@@ -157,29 +150,12 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: ./release-artifacts
+          path: ./artifacts
 
       - name: Prepare release files
         run: |
           mkdir -p ./release-files
-          
-          # Copy Windows exe
-          if [ -f "./release-artifacts/pdf-windows.exe/pdf-windows.exe" ]; then
-            cp "./release-artifacts/pdf-windows.exe/pdf-windows.exe" "./release-files/"
-          fi
-          
-          # Copy Linux binary
-          if [ -f "./release-artifacts/pdf-linux/pdf-linux" ]; then
-            cp "./release-artifacts/pdf-linux/pdf-linux" "./release-files/"
-          fi
-          
-          # Package macOS app
-          if [ -d "./release-artifacts/pdf-macos.app/main.app" ]; then
-            cd "./release-artifacts/pdf-macos.app"
-            zip -r "../../release-files/pdf-macos.zip" main.app
-            cd ../..
-          fi
-          
+          find ./artifacts -type f -exec cp {} ./release-files/ \;
           ls -lah ./release-files/
 
       - name: Get version
