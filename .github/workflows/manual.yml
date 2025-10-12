@@ -15,12 +15,15 @@ jobs:
           - os: windows-latest
             output: '*.exe'
             name: Windows
+            console-mode: disable
           - os: ubuntu-latest
             output: '*.bin'
             name: Linux
+            console-mode: force
           - os: macos-latest
             output: '*.app/**/*'
             name: macOS
+            console-mode: force
 
     runs-on: ${{ matrix.os }}
 
@@ -47,6 +50,7 @@ jobs:
           script-name: main.py
           mode: standalone
           enable-plugins: tk-inter
+          windows-console-mode: ${{ matrix.console-mode }}
           output-file: PDF-Viewer
 
       - name: Upload Artifacts
@@ -62,7 +66,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     permissions:
       contents: write
 
