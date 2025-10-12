@@ -30,7 +30,7 @@ Download the latest release for your platform from the [Releases](../../releases
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/pdf-viewer.git
+git clone https://github.com/eminsk/pdf-viewer.git
 cd pdf-viewer
 
 # Install dependencies
