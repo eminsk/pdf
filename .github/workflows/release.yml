@@ -26,7 +26,7 @@ jobs:
             artifact_name: pdf-macos
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
@@ -44,6 +44,26 @@ jobs:
           pip install -r requirements.txt
           pip install "nuitka>=2.6" ordered-set zstandard
 
+      - name: Install clcache (Windows)
+        if: runner.os == 'Windows'
+        run: pip install clcache
+        shell: bash
+
+      - name: Setup clcache environment (Windows)
+        if: runner.os == 'Windows'
+        run: echo "CLCACHE_DIR=${{ github.workspace }}\\.clcache" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Cache clcache (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: .clcache
+          key: clcache-windows-${{ hashFiles('requirements.txt') }}-${{ hashFiles('main.py') }}
+          restore-keys: |
+            clcache-windows-${{ hashFiles('requirements.txt') }}-
+            clcache-windows-
+
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -52,8 +72,7 @@ jobs:
 
       - name: Install platform dependencies (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew install ccache
+        run: brew install ccache
 
       - name: Build with Nuitka (Linux)
         if: runner.os == 'Linux'
@@ -69,7 +88,7 @@ jobs:
             --file-version=1.0.0 \
             --product-version=1.0.0 \
             --lto=no \
-            --low-memory \
+            --jobs=2 \
             main.py
 
       - name: Build with Nuitka (macOS)
@@ -86,7 +105,7 @@ jobs:
             --file-version=1.0.0 \
             --product-version=1.0.0 \
             --lto=no \
-            --low-memory \
+            --jobs=2 \
             main.py
 
       - name: Build with Nuitka (Windows)
@@ -106,8 +125,11 @@ jobs:
             --copyright="Copyright 2025" ^
             --lto=no ^
             --low-memory ^
+            --jobs=1 ^
             main.py
         shell: cmd
+        env:
+          CLCACHE_CL: cl.exe
 
       - name: Make executable (Linux/macOS)
         if: runner.os != 'Windows'
