@@ -43,43 +43,46 @@ jobs:
           python-version: '3.12'
 
       - name: Install Dependencies
-        run: |
-          uv pip install --system pymupdf pillow nuitka
+        run: uv pip install --system pymupdf pillow nuitka
 
-      - name: Build Executable with Nuitka
+      - name: Build Executable with Nuitka (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          python -m nuitka --standalone --enable-plugin=tk-inter --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build --output-file=PDF-Viewer main.py
+        shell: cmd
+
+      - name: Build Executable with Nuitka (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           python -m nuitka --standalone \
             --enable-plugin=tk-inter \
-            --windows-console-mode=${{ matrix.console-mode }} \
+            --windows-console-mode=force \
             --assume-yes-for-downloads \
             --output-dir=build \
             --output-file=PDF-Viewer \
             main.py
+        shell: bash
 
-      - name: Rename Output (Windows)
+      - name: Find and Copy Executable (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          if (Test-Path "build\main.dist") {
-            Rename-Item -Path "build\main.dist\main.exe" -NewName "PDF-Viewer.exe"
+          Get-ChildItem -Path "build" -Recurse -Filter "*.exe" | ForEach-Object {
+            Copy-Item $_.FullName -Destination "build/PDF-Viewer.exe" -Force
           }
         shell: pwsh
 
-      - name: Rename Output (Unix)
+      - name: Find and Copy Executable (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          if [ -f "build/main.dist/main.bin" ]; then
-            mv build/main.dist/main.bin build/main.dist/PDF-Viewer.bin
-          elif [ -f "build/main.bin" ]; then
-            mv build/main.bin build/PDF-Viewer.bin
-          fi
+          find build -type f -executable -name "*.bin" -o -name "PDF-Viewer" -o -name "main" | head -1 | xargs -I {} cp {} build/PDF-Viewer.bin || true
+          chmod +x build/PDF-Viewer.bin || true
+        shell: bash
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PDF-Viewer-${{ matrix.name }}
-          path: |
-            build/main.dist/${{ matrix.output }}
-            build/${{ matrix.output }}
+          path: build/PDF-Viewer.*
           if-no-files-found: warn
 
   release:
