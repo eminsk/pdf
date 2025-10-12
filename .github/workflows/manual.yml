@@ -1,120 +1,109 @@
-name: Build and Release
+name: Build and Release Executables
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
-          - os: windows-latest
-            output: 'PDF-Viewer.exe'
-            name: Windows
-            console-mode: disable
           - os: ubuntu-latest
-            output: 'PDF-Viewer.bin'
-            name: Linux
-            console-mode: force
+            artifact_name: pdf-linux
+            asset_name: pdf-linux
+          - os: windows-latest
+            artifact_name: pdf-windows.exe
+            asset_name: pdf-windows.exe
           - os: macos-latest
-            output: 'PDF-Viewer.bin'
-            name: macOS
-            console-mode: force
+            artifact_name: pdf-macos
+            asset_name: pdf-macos
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          version: "0.5.11"
-          enable-cache: true
-
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install Dependencies
-        run: uv add pymupdf pillow nuitka
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Build Executable with Nuitka (Windows)
-        if: matrix.os == 'windows-latest'
-        run: python -m nuitka --standalone --enable-plugin=tk-inter --windows-console-mode=disable --assume-yes-for-downloads --output-dir=build --output-file=PDF-Viewer main.py
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name pdf main.py
+
+      - name: Rename executable (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: |
+          mv dist/rps-game dist/${{ matrix.artifact_name }}
+
+      - name: Rename executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          move dist\rps-game.exe dist\${{ matrix.artifact_name }}
         shell: cmd
 
-      - name: Build Executable with Nuitka (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          python -m nuitka --standalone \
-            --enable-plugin=tk-inter \
-            --windows-console-mode=force \
-            --assume-yes-for-downloads \
-            --output-dir=build \
-            --output-file=PDF-Viewer \
-            main.py
-        shell: bash
-
-      - name: Find and Copy Executable (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          Get-ChildItem -Path "build" -Recurse -Filter "*.exe" | ForEach-Object {
-            Copy-Item $_.FullName -Destination "build/PDF-Viewer.exe" -Force
-            Write-Host "Copied: $($_.FullName)"
-          }
-          if (Test-Path "build/PDF-Viewer.exe") {
-            Write-Host "✓ PDF-Viewer.exe готов!"
-          }
-        shell: pwsh
-
-      - name: Find and Copy Executable (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          find build -type f \( -executable -o -name "*.bin" -o -name "PDF-Viewer" \) | head -1 | xargs -I {} cp {} build/PDF-Viewer.bin || true
-          chmod +x build/PDF-Viewer.bin 2>/dev/null || true
-          if [ -f "build/PDF-Viewer.bin" ]; then
-            echo "✓ PDF-Viewer.bin готов!"
-            ls -lh build/PDF-Viewer.bin
-          fi
-        shell: bash
-
-      - name: Upload Artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PDF-Viewer-${{ matrix.name }}
-          path: build/PDF-Viewer.*
-          if-no-files-found: warn
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.artifact_name }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
     permissions:
       contents: write
 
     steps:
-      - name: Download All Artifacts
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          merge-multiple: true
+          path: ./artifacts
 
-      - name: Display structure
-        run: ls -R artifacts/
+      - name: Make executables executable
+        run: |
+          chmod +x ./artifacts/pdf-linux || true
+          chmod +x ./artifacts/pdf-macos || true
 
-      - name: Create Release
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          files: |
+            ./artifacts/pdf-linux
+            ./artifacts/pdf-windows.exe
+            ./artifacts/pdf-macos
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
