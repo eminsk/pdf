@@ -43,7 +43,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install "nuitka>=2.6" ordered-set zstandard
+<<<<<<< HEAD:.github/workflows/release.yml
 
+=======
+      
+>>>>>>> b956cd4414f9287477c311a6c7f0a4c3c4261bf0:.github/workflows/manual.yml
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -92,6 +96,7 @@ jobs:
       - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
         run: |
+<<<<<<< HEAD:.github/workflows/release.yml
           python -m nuitka ^
             --mode=onefile ^
             --assume-yes-for-downloads ^
@@ -107,6 +112,9 @@ jobs:
             --lto=no ^
             --low-memory ^
             main.py
+=======
+          python -m nuitka --mode=onefile --assume-yes-for-downloads --output-filename=${{ matrix.artifact_name }} --windows-console-mode=disable --enable-plugin=tk-inter --windows-icon-from-ico=icon.ico --company-name="YourCompany" --product-name="PDF Tool" --file-version=1.0.0.0 --product-version=1.0.0.0 --copyright="Copyright 2025" main.py
+>>>>>>> b956cd4414f9287477c311a6c7f0a4c3c4261bf0:.github/workflows/manual.yml
         shell: cmd
 
       - name: Make executable (Linux/macOS)
