@@ -45,7 +45,7 @@ jobs:
 
       - name: Install dependencies with uv
         run: |
-          uv sync --dev
+          uv sync --group dev
 
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
@@ -95,7 +95,22 @@ jobs:
       - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
         run: |
-          uv run python -m nuitka --mode=onefile --assume-yes-for-downloads --output-filename=${{ matrix.executable_name }} --windows-console-mode=disable --enable-plugin=tk-inter --windows-icon-from-ico=icon.ico --company-name="PDF Viewer" --product-name="PDF Viewer" --file-version=1.0.0.0 --product-version=1.0.0.0 --copyright="Copyright 2025" --lto=no --low-memory main.py
+          uv run python -m nuitka ^
+            --mode=onefile ^
+            --assume-yes-for-downloads ^
+            --output-filename=${{ matrix.executable_name }} ^
+            --windows-console-mode=disable ^
+            --enable-plugin=tk-inter ^
+            --windows-icon-from-ico=icon.ico ^
+            --company-name="PDF Viewer" ^
+            --product-name="PDF Viewer" ^
+            --file-version=1.0.0.0 ^
+            --product-version=1.0.0.0 ^
+            --copyright="Copyright 2025" ^
+            --lto=no ^
+            --low-memory ^
+            main.py
+        shell: cmd
 
       - name: Make executable (Linux/macOS)
         if: runner.os != 'Windows'

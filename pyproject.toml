@@ -9,16 +9,6 @@ dependencies = [
     "pillow>=11.3.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "nuitka>=2.7.16",
-    "ordered-set>=4.1.0",
-    "zstandard>=0.22.0",
-]
-
-[project.scripts]
-pdf-viewer = "main:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
