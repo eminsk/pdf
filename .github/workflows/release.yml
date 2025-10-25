@@ -109,6 +109,9 @@ jobs:
             --copyright="Copyright 2025" ^
             --lto=no ^
             --low-memory ^
+            --jobs=1 ^
+            --windows-force-stdout-spec=%%TEMP%%\nuitka-%%TIME%%.log ^
+            --windows-force-stderr-spec=%%TEMP%%\nuitka-%%TIME%%.log ^
             main.py
         shell: cmd
 
