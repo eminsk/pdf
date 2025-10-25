@@ -12,13 +12,32 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "nuitka>=2.7.16",
+    "ordered-set>=4.1.0",
+    "zstandard>=0.22.0",
 ]
+
+[project.scripts]
+pdf-viewer = "main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "nuitka>=2.7.16",
+    "ordered-set>=4.1.0", 
+    "zstandard>=0.22.0",
 ]
+
+[tool.nuitka]
+# Nuitka configuration for consistent builds
+mode = "onefile"
+assume-yes-for-downloads = true
+enable-plugin = ["tk-inter"]
+company-name = "PDF Viewer"
+product-name = "PDF Viewer"
+file-version = "1.0.0"
+product-version = "1.0.0"
+lto = "no"
+low-memory = true

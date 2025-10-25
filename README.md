@@ -33,11 +33,15 @@ Download the latest release for your platform from the [Releases](../../releases
 git clone https://github.com/eminsk/pdf-viewer.git
 cd pdf-viewer
 
-# Install dependencies
-pip install pymupdf pillow
+# Install uv (if not already installed)
+# Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Linux/macOS: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies with uv
+uv sync
 
 # Run application
-python main.py
+uv run python main.py
 ```
 
 ## Usage
@@ -121,49 +125,76 @@ pdf-viewer/
 
 ### Building from Source
 
-#### Using Nuitka (Recommended)
+#### Using uv + Nuitka (Recommended)
 
 ```bash
-# Install Nuitka
-pip install nuitka
+# Install dependencies including Nuitka
+uv sync --dev
 
+# Build executable using the build script
+uv run python build.py
+
+# Or build manually with Nuitka
 # Windows
-python -m nuitka --standalone --enable-plugin=tk-inter --onefile main.py
+uv run python -m nuitka --mode=onefile --assume-yes-for-downloads --enable-plugin=tk-inter --windows-console-mode=disable --windows-icon-from-ico=icon.ico main.py
 
-# Linux/macOS
-python -m nuitka --standalone --enable-plugin=tk-inter --onefile main.py
+# Linux
+uv run python -m nuitka --mode=onefile --assume-yes-for-downloads --enable-plugin=tk-inter --linux-icon=icon.png main.py
+
+# macOS
+uv run python -m nuitka --mode=app --assume-yes-for-downloads --enable-plugin=tk-inter --macos-app-icon=icon.icns main.py
 ```
 
-#### Manual Development
+#### Development Mode
 
 ```bash
 # Install dependencies
-pip install pymupdf pillow
+uv sync
 
-# Run application
-python main.py
+# Run application in development
+uv run python main.py
+
+# Run with hot reload during development
+uv run python main.py
 ```
 
 ## Automated Releases
 
-This project uses GitHub Actions for automated cross-platform builds. To create a release:
+This project uses GitHub Actions for automated cross-platform builds with Nuitka. To create a release:
 
-### Create Release Tag
+### Using Release Script (Recommended)
 
 ```bash
-# Tag version
-git tag v0.1.0
-git push origin v0.1.0
+# Create release with new version
+uv run python release.py 1.0.1
+
+# Create release with current version from pyproject.toml
+uv run python release.py --current
+
+# Create tag locally without pushing (for testing)
+uv run python release.py --local
 ```
 
-The CI/CD workflow automatically:
-- Builds executables for Windows, Linux, and macOS
-- Creates a GitHub release
-- Attaches binaries to the release
+### Manual Release Process
+
+```bash
+# Update version in pyproject.toml, then:
+git add .
+git commit -m "Release v1.0.1"
+git tag v1.0.1
+git push origin v1.0.1
+git push origin main
+```
 
 ### Manual Workflow Trigger
 
 Navigate to: **Actions → Build and Release → Run workflow**
+
+The CI/CD workflow automatically:
+- Builds executables for Windows, Linux, and macOS using Nuitka
+- Creates optimized single-file executables
+- Creates a GitHub release with all platform binaries
+- Uses uv for fast dependency management
 
 ## Contributing
 

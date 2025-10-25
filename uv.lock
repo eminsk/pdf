@@ -33,23 +33,33 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "nuitka" },
+    { name = "ordered-set" },
+    { name = "zstandard" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "nuitka" },
+    { name = "ordered-set" },
+    { name = "zstandard" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "nuitka", marker = "extra == 'dev'", specifier = ">=2.7.16" },
+    { name = "ordered-set", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "pymupdf", specifier = ">=1.26.4" },
+    { name = "zstandard", marker = "extra == 'dev'", specifier = ">=0.22.0" },
 ]
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "nuitka", specifier = ">=2.7.16" }]
+dev = [
+    { name = "nuitka", specifier = ">=2.7.16" },
+    { name = "ordered-set", specifier = ">=4.1.0" },
+    { name = "zstandard", specifier = ">=0.22.0" },
+]
 
 [[package]]
 name = "pillow"
