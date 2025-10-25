@@ -108,10 +108,13 @@ jobs:
             --product-version=1.0.0.0 ^
             --copyright="Copyright 2025" ^
             --lto=no ^
-            --low-memory ^
             --jobs=1 ^
-            --windows-force-stdout-spec=%%TEMP%%\nuitka-%%TIME%%.log ^
-            --windows-force-stderr-spec=%%TEMP%%\nuitka-%%TIME%%.log ^
+            --nofollow-import-to=numpy ^
+            --nofollow-import-to=scipy ^
+            --nofollow-import-to=matplotlib ^
+            --include-package=fitz ^
+            --include-package=PIL ^
+            --include-package=tkinter ^
             main.py
         shell: cmd
 
