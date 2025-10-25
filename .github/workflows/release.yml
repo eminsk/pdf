@@ -45,13 +45,14 @@ jobs:
 
       - name: Install dependencies with uv
         run: |
-          uv sync --group dev
+          uv sync
+          uv add --dev nuitka ordered-set zstandard
 
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache patchelf
+          sudo apt-get install -y ccache patchelf build-essential libffi-dev python3-dev
 
       - name: Install platform dependencies (macOS)
         if: runner.os == 'macOS'
