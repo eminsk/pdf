@@ -35,18 +35,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
       - name: Set up Python
-        run: uv python install 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
 
-      - name: Install dependencies with uv
+      - name: Install dependencies
         run: |
-          uv sync
-          uv add --dev nuitka ordered-set zstandard
+          python -m pip install --upgrade pip
+          pip install pymupdf pillow
+          pip install nuitka ordered-set zstandard
 
       - name: Install platform dependencies (Linux)
         if: runner.os == 'Linux'
@@ -62,7 +61,7 @@ jobs:
       - name: Build with Nuitka (Linux)
         if: runner.os == 'Linux'
         run: |
-          uv run python -m nuitka \
+          python -m nuitka \
             --mode=onefile \
             --assume-yes-for-downloads \
             --output-filename=${{ matrix.executable_name }} \
@@ -79,7 +78,7 @@ jobs:
       - name: Build with Nuitka (macOS)
         if: runner.os == 'macOS'
         run: |
-          uv run python -m nuitka \
+          python -m nuitka \
             --mode=app \
             --assume-yes-for-downloads \
             --output-filename=${{ matrix.executable_name }} \
@@ -96,7 +95,7 @@ jobs:
       - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
         run: |
-          uv run python -m nuitka ^
+          python -m nuitka ^
             --mode=onefile ^
             --assume-yes-for-downloads ^
             --output-filename=${{ matrix.executable_name }} ^
