@@ -1,6 +1,6 @@
 [project]
 name = "pdf-viewer"
-version = "1.0.0"
+version = "1.0.1"
 description = "Professional cross-platform PDF viewer with dual-page mode and animations"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,7 +27,7 @@ assume-yes-for-downloads = true
 enable-plugin = ["tk-inter"]
 company-name = "PDF Viewer"
 product-name = "PDF Viewer"
-file-version = "1.0.0"
-product-version = "1.0.0"
+file-version = "1.0.1"
+product-version = "1.0.1"
 lto = "no"
 low-memory = true
