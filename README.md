@@ -37,7 +37,12 @@ cd pdf-viewer
 # Windows: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 # Linux/macOS: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies with uv
+# Install system dependencies (Linux/macOS only)
+# Ubuntu/Debian: sudo apt-get install poppler-utils
+# macOS: brew install poppler
+# Windows: No additional dependencies needed
+
+# Install Python dependencies with uv
 uv sync
 
 # Run application
@@ -93,14 +98,15 @@ The application uses object-oriented design with the following components:
 
 ### Dependencies
 
-- **PyMuPDF** (fitz): PDF rendering engine
+- **pdf2image**: PDF to image conversion (lightweight alternative to PyMuPDF)
 - **Pillow**: Image processing and transformations
 - **tkinter**: Native GUI framework (included with Python)
+- **poppler**: PDF rendering backend (required on Linux/macOS)
 
 ### Performance
 
-- **Memory**: ~50-100MB for typical PDFs (depends on page complexity)
-- **Rendering**: Hardware-accelerated via PyMuPDF
+- **Memory**: ~30-80MB for typical PDFs (optimized with pdf2image)
+- **Rendering**: Fast conversion via poppler backend
 - **Animation**: 30 FPS page flip transitions
 
 ## Development
@@ -108,8 +114,9 @@ The application uses object-oriented design with the following components:
 ### Requirements
 
 - Python 3.12+
-- PyMuPDF >= 1.26.4
+- pdf2image >= 1.17.0
 - Pillow >= 11.3.0
+- poppler (Linux/macOS only - see installation notes below)
 
 ### Project Structure
 
@@ -219,8 +226,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Built with [PyMuPDF](https://pymupdf.readthedocs.io/) for PDF rendering
+- Built with [pdf2image](https://github.com/Belval/pdf2image) for lightweight PDF conversion
 - Uses [Pillow](https://python-pillow.org/) for image processing
+- Powered by [poppler](https://poppler.freedesktop.org/) PDF rendering engine
 - Inspired by modern document viewers
 
 ## Support
