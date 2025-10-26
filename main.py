@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Dependencies:
-# pip install PyMuPDF Pillow
+# pip install pdf2image Pillow
 
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
-from typing import Optional, Tuple
-import fitz  # PyMuPDF
+from typing import Optional, Tuple, List
+import tempfile
+import os
 from PIL import Image, ImageTk
+
+try:
+    from pdf2image import convert_from_path
+    PDF2IMAGE_AVAILABLE = True
+except ImportError:
+    PDF2IMAGE_AVAILABLE = False
 
 
 class PDFViewer(tk.Tk):
@@ -27,7 +34,7 @@ class PDFViewer(tk.Tk):
         self.minsize(800, 600)
 
         # State
-        self.doc: Optional[fitz.Document] = None
+        self.pdf_images: List[Image.Image] = []
         self.page_count: int = 0
         self.page_index: int = 0
         self.zoom: float = 1.0
@@ -141,7 +148,7 @@ class PDFViewer(tk.Tk):
         self.v_scroll.pack(side="right", fill="y")
         self.canvas.pack(side="top", fill="both", expand=True)
 
-        self.canvas.bind("<Configure>", lambda e: self.fit_mode and self.doc and self._render())
+        self.canvas.bind("<Configure>", lambda e: self.fit_mode and self.pdf_images and self._render())
         self.canvas.bind("<ButtonPress-1>", self._scroll_start)
         self.canvas.bind("<B1-Motion>", self._scroll_move)
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
@@ -179,27 +186,35 @@ class PDFViewer(tk.Tk):
         path and self._load(Path(path))
 
     def _load(self, path: Path) -> None:
-        self.doc and self.doc.close()
-        self.doc = fitz.open(path.as_posix())
-        self.filepath = path
-        self.page_count = len(self.doc)
-        self.page_index = 0
-        self.zoom = 1.0
-        self.fit_mode = True
-
-        self.page_scale.configure(to=max(1, self.page_count))
-        self._block_scale_callback = True
+        if not PDF2IMAGE_AVAILABLE:
+            messagebox.showerror("Error", "pdf2image library is not installed.\nPlease install it with: pip install pdf2image")
+            return
+        
         try:
-            self.page_scale.set(1.0)
-        finally:
-            self._block_scale_callback = False
+            # Convert PDF to images
+            self.pdf_images = convert_from_path(str(path), dpi=150)
+            self.filepath = path
+            self.page_count = len(self.pdf_images)
+            self.page_index = 0
+            self.zoom = 1.0
+            self.fit_mode = True
 
-        self.page_scale.state(["!disabled"])
-        self._set_controls_state("!disabled")
-        self.hint.place_forget()
-        self._render()
-        self.canvas.xview_moveto(0)
-        self.canvas.yview_moveto(0)
+            self.page_scale.configure(to=max(1, self.page_count))
+            self._block_scale_callback = True
+            try:
+                self.page_scale.set(1.0)
+            finally:
+                self._block_scale_callback = False
+
+            self.page_scale.state(["!disabled"])
+            self._set_controls_state("!disabled")
+            self.hint.place_forget()
+            self._render()
+            self.canvas.xview_moveto(0)
+            self.canvas.yview_moveto(0)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load PDF: {str(e)}")
+            return
 
     def _set_controls_state(self, state: str) -> None:
         for w in (self.prev_btn, self.next_btn, self.zoom_out_btn,
@@ -210,7 +225,7 @@ class PDFViewer(tk.Tk):
 
     def _go_animated(self, index: int, direction: int) -> None:
         """Navigate with flip animation"""
-        if not self.doc or self.is_animating:
+        if not self.pdf_images or self.is_animating:
             return
 
         # При двухстраничном режиме корректируем индекс к четному
@@ -283,7 +298,7 @@ class PDFViewer(tk.Tk):
 
     def _go(self, index: int) -> None:
         """Instant navigation without animation"""
-        self.doc and self._set_page(sorted((0, index, self.page_count - 1))[1])
+        self.pdf_images and self._set_page(sorted((0, index, self.page_count - 1))[1])
 
     def _set_page(self, idx: int) -> None:
         self.page_index = idx
@@ -326,7 +341,7 @@ class PDFViewer(tk.Tk):
     # ---------- Rendering ----------
 
     def _render(self) -> None:
-        self.doc and self._render_pages()
+        self.pdf_images and self._render_pages()
 
     def _render_pages(self) -> None:
         """Render one or two pages depending on mode"""
@@ -346,23 +361,36 @@ class PDFViewer(tk.Tk):
         self._update_status()
 
     def _get_page_image(self, page_idx: int) -> Image.Image:
-        """Render single page to PIL Image"""
-        page = self.doc.load_page(page_idx)
-        rect = page.rect
-
+        """Get page image from pdf2image converted images"""
+        if page_idx >= len(self.pdf_images):
+            return Image.new('RGB', (800, 600), color='white')
+        
+        # Get the original image
+        img = self.pdf_images[page_idx]
+        
         cw = max(1, self.canvas.winfo_width() - self.pad * 2)
         ch = max(1, self.canvas.winfo_height() - self.pad * 2)
 
         # Adjust canvas size for dual mode
         effective_cw = cw // 2 if self.dual_page_mode and self.page_index + 1 < self.page_count else cw
 
-        fit_scale = min(effective_cw / rect.width, ch / rect.height)
-        scale = (fit_scale, self.zoom)[not self.fit_mode]
+        # Calculate scale
+        if self.fit_mode:
+            fit_scale = min(effective_cw / img.width, ch / img.height)
+            scale = fit_scale
+        else:
+            scale = self.zoom
+        
         scale = sorted((0.2, scale, 8.0))[1]
-
-        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
-        mode = ("RGB", "RGBA")[pix.alpha > 0]
-        return Image.frombytes(mode, (pix.width, pix.height), pix.samples)
+        
+        # Resize image
+        new_width = int(img.width * scale)
+        new_height = int(img.height * scale)
+        
+        if new_width > 0 and new_height > 0:
+            return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        else:
+            return img
 
     def _combine_images_horizontal(self, images: list) -> Image.Image:
         """Combine two images side by side"""
