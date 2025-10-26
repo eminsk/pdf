@@ -81,7 +81,6 @@ jobs:
           python -m nuitka \
             --mode=app \
             --assume-yes-for-downloads \
-            --output-filename=${{ matrix.executable_name }} \
             --enable-plugin=tk-inter \
             --macos-app-icon=icon.icns \
             --company-name="PDF Viewer" \
@@ -91,6 +90,18 @@ jobs:
             --lto=no \
             --low-memory \
             main.py
+          echo "Listing files after build:"
+          ls -la
+          echo "Looking for .app bundles:"
+          find . -name "*.app" -type d
+          if [ -d "main.app" ]; then
+            mv main.app ${{ matrix.executable_name }}
+          elif [ -d "main.dist/main.app" ]; then
+            mv main.dist/main.app ${{ matrix.executable_name }}
+          else
+            echo "ERROR: No .app bundle found!"
+            exit 1
+          fi
 
       - name: Build with Nuitka (Windows)
         if: runner.os == 'Windows'
@@ -112,8 +123,8 @@ jobs:
             main.py
         shell: cmd
 
-      - name: Make executable (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Make executable (Linux only)
+        if: runner.os == 'Linux'
         run: chmod +x ${{ matrix.executable_name }}
 
       - name: Upload artifact
